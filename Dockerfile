@@ -12,7 +12,7 @@ COPY *.go ./
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o compexchange .
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
-FROM alpine:3.20
+FROM alpine:3.23
 
 # ca-certificates: required for HTTPS calls to the Discord API.
 # tzdata: correct timestamps in log output.
