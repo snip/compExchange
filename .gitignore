@@ -1,0 +1,22 @@
+# Environment — contains secrets, never commit
+.env
+comps/*.env
+
+# Go build artifacts
+compexchange
+compExchange
+*.exe
+*.test
+*.out
+
+# Go module cache / vendor
+vendor/
+
+# macOS
+.DS_Store
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo

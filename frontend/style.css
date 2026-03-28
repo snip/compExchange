@@ -1,0 +1,474 @@
+/* ── Reset & base ──────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #000;
+}
+
+/* ── Full-screen map iframe ────────────────────────────────────────────────── */
+#map {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  z-index: 0;
+}
+
+/* ── Pinned messages panel (left side) ─────────────────────────────────────── */
+
+/*
+ * The panel is a horizontal flex row: [tab | content].
+ * The tab is always visible (hover trigger). The content slides in on hover.
+ * This avoids the opacity:0 + pointer-events:none deadlock.
+ */
+#pinned-panel {
+  position: fixed;
+  left: 0;
+  bottom: 14px;                  /* anchored near bottom-left, above the chat bar */
+  z-index: 11;                   /* above the chat overlay (z-index: 10) */
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  /* A defined height (not just max-height) is required for the inner
+     flex scroll to work. min() keeps it reasonable on small screens. */
+  height: min(380px, 52vh);
+}
+
+/* ── Always-visible tab ────────────────────────────────────────────────────── */
+#pinned-tab {
+  width: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-end;         /* pin icon near the bottom, matching panel anchor */
+  justify-content: center;
+  padding-bottom: 10px;
+  background: rgba(10, 10, 20, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0 6px 6px 0;
+  cursor: default;
+  transition: background 0.15s;
+}
+
+#pinned-panel:hover #pinned-tab,
+#pinned-panel.auto-open #pinned-tab,
+#pinned-panel.locked #pinned-tab {
+  background: rgba(10, 10, 20, 0.92);
+  border-radius: 0;
+}
+
+/* Locked state: pin icon turns gold to signal the panel is pinned open */
+#pinned-panel.locked .pin-icon {
+  color: #faa61a;
+  filter: drop-shadow(0 0 5px rgba(250, 166, 26, 0.8));
+}
+
+.pin-icon {
+  width: 14px;
+  height: 14px;
+  color: #5865f2;
+  flex-shrink: 0;
+  transition: color 0.2s, filter 0.2s;
+}
+
+/* ── Slide-out content ─────────────────────────────────────────────────────── */
+#pinned-content {
+  width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  /* height:100% + min-height:0 lets the inner flex scroll work correctly */
+  height: 100%;
+  min-height: 0;
+  transition: width 0.25s ease;
+}
+
+#pinned-panel:hover #pinned-content,
+#pinned-panel.auto-open #pinned-content,
+#pinned-panel.locked #pinned-content {
+  width: 260px;
+}
+
+#pinned-header {
+  min-width: 260px;
+  display: flex;
+  align-items: center;
+  padding: 7px 12px;
+  flex-shrink: 0;
+  background: rgba(10, 10, 20, 0.92);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+#pinned-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #b9bbbe;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+#pinned-messages {
+  min-width: 260px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;   /* flex child must opt out of min-height:auto to scroll */
+  background: rgba(10, 10, 20, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.12) transparent;
+}
+
+#pinned-messages::-webkit-scrollbar { width: 3px; }
+#pinned-messages::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border-radius: 2px;
+}
+
+.pinned-message {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  animation: fadeIn 0.3s ease;
+}
+
+.pinned-message:last-child { border-bottom: none; }
+
+/* highlight is applied via JS inline styles to avoid conflicting with fadeIn */
+
+.pinned-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 4px;
+}
+
+.pinned-content {
+  font-size: var(--chat-font-size, 13px);
+  text-align: left !important;
+}
+
+.pinned-empty {
+  padding: 12px;
+  font-size: 12px;
+  color: #72767d;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ── Competition title bar (top) ───────────────────────────────────────────── */
+#comp-header {
+  display: none; /* shown by JS once compName is known */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 12;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 16px;
+  background: rgba(10, 10, 20, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+#comp-title-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+#comp-title-link:hover { color: #5865f2; }
+
+/* ── Discord overlay ───────────────────────────────────────────────────────── */
+#overlay {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  height: 30vh;
+  min-height: 44px;
+  max-height: 92vh;
+  /*
+   * No background or blur here — both are handled by #messages so they can
+   * be governed by the same mask-image gradient, giving a truly transparent
+   * (no blur, no background) top and a fully blurred bottom.
+   */
+  transition: height 0.25s ease;
+}
+
+#overlay.collapsed {
+  height: 44px !important;
+  overflow: hidden;
+}
+
+/* ── Resize handle ─────────────────────────────────────────────────────────── */
+#resize-handle {
+  position: absolute;
+  top: -10px;
+  left: 0;
+  right: 0;
+  height: 20px;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 11;
+  /* Widen the hit zone without making it visually large */
+}
+
+.resize-grip {
+  width: 44px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 2px;
+  opacity: 0;
+  transition: background 0.15s, transform 0.15s, opacity 0.2s ease;
+}
+
+#overlay:hover .resize-grip {
+  opacity: 1;
+}
+
+#resize-handle:hover .resize-grip,
+#resize-handle.dragging .resize-grip {
+  background: rgba(255, 255, 255, 0.55);
+  transform: scaleY(1.4);
+}
+
+/* ── Header bar ────────────────────────────────────────────────────────────── */
+#overlay-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  flex-shrink: 0;
+  user-select: none;
+  background: rgba(10, 10, 20, 0.92);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  /* Hidden by default; fades in on overlay hover.
+     pointer-events:none prevents the invisible bar from eating map clicks. */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+#overlay:hover #overlay-header {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Left spacer — same flex-basis as #overlay-controls so the title stays centred */
+.header-spacer {
+  flex: 1;
+}
+
+#overlay-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #b9bbbe;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+#discord-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #b9bbbe;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+#discord-link:hover {
+  color: #ffffff;
+}
+
+.discord-icon {
+  width: 15px;
+  height: 15px;
+  color: #5865f2;
+  flex-shrink: 0;
+}
+
+/* ── Right-side controls (font size + toggle) ──────────────────────────────── */
+#overlay-controls {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.ctrl-btn {
+  background: none;
+  border: none;
+  color: #72767d;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.ctrl-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #dcddde;
+}
+
+.ctrl-divider {
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 4px;
+}
+
+/* ── Message list ──────────────────────────────────────────────────────────── */
+#messages {
+  overflow-y: auto;
+  padding: 10px 16px 12px;
+  flex: 1;
+  /*
+   * column-reverse means the first child in the DOM is rendered at the
+   * BOTTOM of the container. New messages are prepended in JS (insertBefore),
+   * so they always appear at the visual bottom without any scrollTop
+   * manipulation. scrollTop=0 is permanently "at the newest message".
+   * Scrolling UP reveals older messages.
+   */
+  display: flex;
+  flex-direction: column-reverse;
+
+  /*
+   * The blur + background both fade from fully transparent at the top to
+   * fully opaque at the bottom. The mask-image governs all three at once:
+   * backdrop-filter, background, and text.
+   */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+
+  background: linear-gradient(
+    to bottom,
+    rgba(10, 10, 20, 0)    0%,
+    rgba(10, 10, 20, 0.25) 22%,
+    rgba(10, 10, 20, 0.62) 45%,
+    rgba(10, 10, 20, 0.88) 68%,
+    rgba(10, 10, 20, 0.92) 100%
+  );
+
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 0.5) 6%,
+    black 18%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 0.5) 6%,
+    black 18%
+  );
+
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.12) transparent;
+}
+
+#messages::-webkit-scrollbar { width: 3px; }
+#messages::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border-radius: 2px;
+}
+
+/* ── Individual message — centered layout ──────────────────────────────────── */
+.message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 6px 8px;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.message-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-bottom: 3px;
+}
+
+.avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+  background: #2f3136;
+}
+
+.author {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.timestamp {
+  font-size: 10px;
+  color: #72767d;
+}
+
+.content {
+  font-size: var(--chat-font-size, 13px);
+  color: #dcddde;
+  line-height: 1.45;
+  word-break: break-word;
+  white-space: pre-wrap;
+  max-width: 720px;
+}
+
+.content a {
+  color: #00aff4;
+  text-decoration: none;
+}
+
+.content a:hover {
+  text-decoration: underline;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  #overlay { height: 40vh; }
+}

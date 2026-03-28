@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CompExchange — Gliding Race Viewer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!--
+    GlideAndSeek iframe. Query parameters can be set in the URL, e.g.:
+    http://localhost:8080/?taskUrl=https://...&viewport=51.7,-2.1,10&hideSidebar=true
+    They are forwarded to the iframe automatically by the script below.
+  -->
+  <iframe
+    id="map"
+    src=""
+    allow="geolocation"
+    allowfullscreen
+  ></iframe>
+
+  <!-- Competition title bar (top) -->
+  <div id="comp-header">
+    <a id="comp-title-link" href="#" target="_blank" rel="noopener noreferrer">
+      <span id="comp-title"></span>
+    </a>
+  </div>
+
+  <!-- Pinned messages panel (left side) -->
+  <div id="pinned-panel">
+
+    <!-- Always-visible tab: acts as the hover trigger -->
+    <div id="pinned-tab" title="Pinned messages">
+      <svg class="pin-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
+      </svg>
+    </div>
+
+    <!-- Slide-out content: hidden until panel is hovered -->
+    <div id="pinned-content">
+      <div id="pinned-header">
+        <span id="pinned-title">Pinned Messages</span>
+      </div>
+      <div id="pinned-messages"></div>
+    </div>
+
+  </div>
+
+  <!-- Discord overlay -->
+  <div id="overlay">
+
+    <!-- Drag handle: grab and pull up/down to resize the overlay -->
+    <div id="resize-handle" title="Drag to resize">
+      <div class="resize-grip"></div>
+    </div>
+
+    <div id="overlay-header">
+      <!-- Left spacer mirrors the right controls width to keep the title centred -->
+      <div class="header-spacer"></div>
+
+      <span id="overlay-title">
+        <a id="discord-link" href="#" target="_blank" rel="noopener noreferrer" style="display:none">
+          <svg class="discord-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
+          </svg>
+          Join us on Discord to comment live below
+        </a>
+      </span>
+
+      <div id="overlay-controls">
+        <button id="font-decrease-btn" class="ctrl-btn" title="Decrease font size">A−</button>
+        <button id="font-reset-btn"    class="ctrl-btn" title="Reset font size">Aa</button>
+        <button id="font-increase-btn" class="ctrl-btn" title="Increase font size">A+</button>
+        <div class="ctrl-divider"></div>
+        <button id="toggle-btn" class="ctrl-btn" aria-label="Toggle overlay" title="Toggle overlay">▼</button>
+      </div>
+    </div>
+
+    <div id="messages"></div>
+  </div>
+
+  <script>
+    // ── Load server config (GlideAndSeek URL + Discord channel link) ─────────
+    fetch('config')
+      .then(r => r.json())
+      .then(cfg => {
+        document.getElementById('map').src = cfg.glideUrl;
+        if (cfg.discordUrl) {
+          const link = document.getElementById('discord-link');
+          link.href = cfg.discordUrl;
+          link.style.display = 'inline-flex';
+        }
+        if (cfg.compName) {
+          document.title = cfg.compName + ' — CompExchange';
+          document.getElementById('comp-title').textContent = cfg.compName;
+          const header = document.getElementById('comp-header');
+          const titleLink = document.getElementById('comp-title-link');
+          if (cfg.compWebsite) {
+            titleLink.href = cfg.compWebsite;
+            header.title = 'Visit competition website';
+          } else {
+            titleLink.style.pointerEvents = 'none';
+            titleLink.style.cursor = 'default';
+          }
+          header.style.display = 'flex';
+          // Push the iframe down so it isn't obscured by the title bar.
+          document.getElementById('map').style.top = header.offsetHeight + 'px';
+        }
+      })
+      .catch(() => {});
+
+    // ── SSE — live Discord messages ───────────────────────────────────────────
+    const messagesEl = document.getElementById('messages');
+    const MAX_VISIBLE = 50;
+    let highlightReady = false;  // false during initial message burst
+
+    // Escape special HTML characters in a plain string.
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // Wrap bare URLs in clickable <a> tags.
+    // URLs are detected in the original text (before HTML escaping) so that
+    // query-string characters like '&' do not truncate the match.
+    // A URL ends at the first whitespace character or end of string.
+    function linkify(text) {
+      const urlRe = /https?:\/\/\S+/g;
+      let result = '';
+      let lastIndex = 0;
+      let match;
+      while ((match = urlRe.exec(text)) !== null) {
+        result += escapeHtml(text.slice(lastIndex, match.index));
+        const escaped = escapeHtml(match[0]);
+        result += `<a href="${escaped}" target="_blank" rel="noopener noreferrer">${escaped}</a>`;
+        lastIndex = match.index + match[0].length;
+      }
+      result += escapeHtml(text.slice(lastIndex));
+      return result;
+    }
+
+    function formatTime(isoString) {
+      const d = new Date(isoString);
+      const now = new Date();
+      const isToday = d.getFullYear() === now.getFullYear() &&
+                      d.getMonth()    === now.getMonth()    &&
+                      d.getDate()     === now.getDate();
+      const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      if (isToday) return time;
+      const yyyy = d.getFullYear();
+      const mm   = String(d.getMonth() + 1).padStart(2, '0');
+      const dd   = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd} ${time}`;
+    }
+
+    function appendMessage(msg) {
+      if (!msg.content || !msg.content.trim()) return;
+      const item = document.createElement('div');
+      item.className = 'message';
+
+      // Meta row: avatar + author + timestamp — all centered
+      const meta = document.createElement('div');
+      meta.className = 'message-meta';
+
+      const avatar = document.createElement('img');
+      avatar.className = 'avatar';
+      avatar.src = msg.avatar || '';
+      avatar.alt = msg.author;
+      avatar.onerror = () => { avatar.style.display = 'none'; };
+
+      const author = document.createElement('span');
+      author.className = 'author';
+      author.textContent = msg.author;
+
+      const time = document.createElement('span');
+      time.className = 'timestamp';
+      time.textContent = formatTime(msg.timestamp);
+
+      meta.appendChild(avatar);
+      meta.appendChild(author);
+      meta.appendChild(time);
+
+      const content = document.createElement('div');
+      content.className = 'content';
+      content.innerHTML = linkify(msg.content);
+
+      item.appendChild(meta);
+      item.appendChild(content);
+
+      // Prepend so the newest message is the first child → rendered at the
+      // visual bottom by flex-direction: column-reverse. No scrollTop needed.
+      messagesEl.insertBefore(item, messagesEl.firstChild);
+      if (highlightReady) requestAnimationFrame(() => highlightElement(item));
+
+      // Trim the oldest message (last child = visual top = oldest).
+      while (messagesEl.children.length > MAX_VISIBLE) {
+        messagesEl.removeChild(messagesEl.lastChild);
+      }
+    }
+
+    function connectSSE() {
+      const es = new EventSource('events');
+
+      // Reload pins on every (re)connect — catches changes that happened while
+      // the SSE connection was down.
+      es.onopen = () => {
+        loadPinned();
+        // Allow a short window for the prefill burst to arrive before
+        // enabling highlights, so only genuinely new messages flash gold.
+        highlightReady = false;
+        setTimeout(() => { highlightReady = true; }, 1500);
+      };
+
+      // Named event: new chat message
+      es.addEventListener('message', (e) => {
+        try { appendMessage(JSON.parse(e.data)); } catch (_) {}
+      });
+
+      // A message was pinned — open the panel, reload, then highlight the
+      // newly pinned message (last in the list) for 3 seconds.
+      es.addEventListener('pins-added', () => {
+        autoOpenPanel();
+        loadPinned().then(msgs => {
+          requestAnimationFrame(() => {
+            // Highlight the newest entry in the pinned panel.
+            const pinItems = pinnedEl.querySelectorAll('.pinned-message');
+            if (pinItems.length) highlightElement(pinItems[pinItems.length - 1]);
+
+            // Also highlight the matching message in the chat.
+            // Discord returns newest-pinned first, so msgs[0] is the new pin.
+            if (msgs && msgs.length && msgs[0].content) {
+              const needle = msgs[0].content.trim();
+              for (const chatItem of messagesEl.querySelectorAll('.message')) {
+                const c = chatItem.querySelector('.content');
+                if (c && c.textContent.trim() === needle) {
+                  highlightElement(chatItem);
+                  break;
+                }
+              }
+            }
+          });
+        });
+      });
+
+      // A message was unpinned — reload silently, no auto-open.
+      es.addEventListener('pins-removed', () => {
+        loadPinned();
+      });
+
+      es.onerror = () => {
+        es.close();
+        setTimeout(connectSSE, 3000);
+      };
+    }
+
+    // Briefly flash an element gold, then fade back to transparent over 3 s.
+    // Uses inline styles (highest specificity) to avoid conflicting with the
+    // existing fadeIn CSS animation on .message / .pinned-message.
+    function highlightElement(el) {
+      el.style.transition = 'none';
+      el.style.background = 'rgba(250, 166, 26, 0.6)';
+      el.style.boxShadow  = 'inset 0 0 0 1px rgba(250, 166, 26, 0.85)';
+      requestAnimationFrame(() => {
+        el.style.transition = 'background 3s ease, box-shadow 3s ease';
+        el.style.background = 'transparent';
+        el.style.boxShadow  = 'inset 0 0 0 1px transparent';
+      });
+      setTimeout(() => {
+        el.style.removeProperty('transition');
+        el.style.removeProperty('background');
+        el.style.removeProperty('box-shadow');
+      }, 3200);
+    }
+
+    connectSSE();
+
+    // ── Pinned messages ───────────────────────────────────────────────────────
+    const pinnedEl  = document.getElementById('pinned-messages');
+    const pinnedTab = document.getElementById('pinned-tab');
+    let autoCloseTimer = null;
+
+    // Toggle locked-open state when the pin tab is clicked.
+    pinnedTab.addEventListener('click', () => {
+      const panel = document.getElementById('pinned-panel');
+      panel.classList.toggle('locked');
+      clearTimeout(autoCloseTimer);
+    });
+
+    function autoOpenPanel() {
+      const panel   = document.getElementById('pinned-panel');
+      const content = document.getElementById('pinned-content');
+      if (!panel || !content) return;
+
+      // If already locked open, nothing to do.
+      if (panel.classList.contains('locked')) return;
+
+      content.style.width = '260px';
+      clearTimeout(autoCloseTimer);
+      autoCloseTimer = setTimeout(() => {
+        if (!panel.classList.contains('locked')) {
+          // Always clear the inline style. If the panel is still hovered the
+          // CSS :hover rule keeps it open; when the mouse leaves it closes
+          // normally. Leaving the inline style set would cause it to stay
+          // open forever after the mouse moves away.
+          content.style.width = '';
+        }
+      }, 5000);
+    }
+
+    function renderPinned(msgs) {
+      const panel = document.getElementById('pinned-panel');
+      pinnedEl.innerHTML = '';
+
+      // Filter out empty messages first so we know the real count.
+      const visible = (msgs || []).filter(m => m.content && m.content.trim());
+      if (visible.length === 0) {
+        panel.style.display = 'none';
+        return;
+      }
+      panel.style.display = '';
+
+      // Discord returns newest-pinned first; reverse so oldest is at top,
+      // newest at bottom — matching the chat panel convention.
+      const ordered = visible.slice().reverse();
+      for (const msg of ordered) {
+        const item = document.createElement('div');
+        item.className = 'pinned-message';
+
+        const meta = document.createElement('div');
+        meta.className = 'pinned-meta';
+
+        const avatar = document.createElement('img');
+        avatar.className = 'avatar';
+        avatar.src = msg.avatar || '';
+        avatar.alt = msg.author;
+        avatar.onerror = () => { avatar.style.display = 'none'; };
+
+        const author = document.createElement('span');
+        author.className = 'author';
+        author.textContent = msg.author;
+
+        const time = document.createElement('span');
+        time.className = 'timestamp';
+        time.textContent = formatTime(msg.timestamp);
+
+        meta.appendChild(avatar);
+        meta.appendChild(author);
+        meta.appendChild(time);
+
+        const content = document.createElement('div');
+        content.className = 'content pinned-content';
+        content.innerHTML = linkify(msg.content);
+
+        item.appendChild(meta);
+        item.appendChild(content);
+        pinnedEl.appendChild(item);
+      }
+    }
+
+    function loadPinned() {
+      return fetch('pinned')
+        .then(r => r.json())
+        .then(msgs => {
+          renderPinned(msgs);
+          pinnedEl.scrollTop = pinnedEl.scrollHeight;
+          return msgs;
+        })
+        .catch(() => []);
+    }
+
+    // ── Collapse / expand toggle ──────────────────────────────────────────────
+    const overlay   = document.getElementById('overlay');
+    const toggleBtn = document.getElementById('toggle-btn');
+
+    toggleBtn.addEventListener('click', () => {
+      const collapsed = overlay.classList.toggle('collapsed');
+      toggleBtn.textContent = collapsed ? '▲' : '▼';
+      toggleBtn.title = collapsed ? 'Expand overlay' : 'Collapse overlay';
+    });
+
+    // ── Font size controls ────────────────────────────────────────────────────
+    const FONT_DEFAULT = 13;
+    const FONT_MIN     = 9;
+    const FONT_MAX     = 48;
+    const FONT_STEP    = 1;
+    let fontSize = FONT_DEFAULT;
+
+    function applyFontSize(size) {
+      fontSize = Math.min(FONT_MAX, Math.max(FONT_MIN, size));
+      // Keep the CSS variable in sync so newly created messages inherit the
+      // right size without needing extra code in appendMessage / renderPinned.
+      document.documentElement.style.setProperty('--chat-font-size', fontSize + 'px');
+      // CSS variable propagation can be deferred for off-screen elements inside
+      // overflow scroll containers. Setting the inline style directly forces an
+      // immediate recalculation on every element, visible or not.
+      document.querySelectorAll('.content').forEach(el => {
+        el.style.fontSize = fontSize + 'px';
+      });
+    }
+
+    document.getElementById('font-decrease-btn').addEventListener('click', () => applyFontSize(fontSize - FONT_STEP));
+    document.getElementById('font-reset-btn').addEventListener('click',    () => applyFontSize(FONT_DEFAULT));
+    document.getElementById('font-increase-btn').addEventListener('click', () => applyFontSize(fontSize + FONT_STEP));
+
+    // ── Vertical resize by dragging the handle ────────────────────────────────
+    //
+    // Uses the Pointer Events API with setPointerCapture so the browser owns
+    // the drag lifecycle. This prevents the "stuck drag" problem where releasing
+    // the mouse outside the window left the overlay resizing on every mousemove.
+    //
+    const resizeHandle = document.getElementById('resize-handle');
+
+    const MIN_H = 44;
+    const MAX_H = () => window.innerHeight * 0.92;
+
+    let dragStartY = 0;
+    let dragStartH = 0;
+
+    resizeHandle.addEventListener('pointerdown', (e) => {
+      if (overlay.classList.contains('collapsed')) return;
+      e.preventDefault();
+      // Capture routes all future pointer events here until pointerup/cancel,
+      // even if the pointer leaves the element or the browser window.
+      resizeHandle.setPointerCapture(e.pointerId);
+      dragStartY = e.clientY;
+      dragStartH = overlay.offsetHeight;
+      resizeHandle.classList.add('dragging');
+      overlay.style.transition = 'none';
+    });
+
+    resizeHandle.addEventListener('pointermove', (e) => {
+      // Only fires while captured (i.e. button is held).
+      if (!resizeHandle.hasPointerCapture(e.pointerId)) return;
+      const delta = dragStartY - e.clientY;
+      const newH  = Math.min(MAX_H(), Math.max(MIN_H, dragStartH + delta));
+      overlay.style.height = newH + 'px';
+      // No scroll management needed: column-reverse keeps newest at scrollTop=0.
+    });
+
+    function endDrag(e) {
+      resizeHandle.classList.remove('dragging');
+      overlay.style.transition = '';
+    }
+
+    resizeHandle.addEventListener('pointerup',     endDrag);
+    resizeHandle.addEventListener('pointercancel', endDrag);
+  </script>
+</body>
+</html>

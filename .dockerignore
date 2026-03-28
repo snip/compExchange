@@ -1,0 +1,25 @@
+# Git
+.git
+.gitignore
+
+# Secrets — never bake into the image
+.env
+comps/*.env
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.swo
+
+# Go build artefacts
+compexchange
+compExchange
+*.exe
+*.test
+*.out
+
+# Docs / meta
+README.md
+*.plan.md

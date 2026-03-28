@@ -1,0 +1,12 @@
+services:
+  compexchange:
+    build: .
+    ports:
+      - "${PORT:-8080}:8080"
+    volumes:
+      # Mount the local comps/ directory so you can add/remove competition
+      # config files without rebuilding the image.
+      - ./comps:/app/comps
+    environment:
+      PORT: "8080"
+    restart: unless-stopped
