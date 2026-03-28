@@ -130,6 +130,23 @@ The server detects them at runtime — no restart needed:
 
 ---
 
+## CI/CD
+
+A GitHub Actions workflow (`.github/workflows/docker-publish.yml`) builds and pushes the Docker image on every push to `main`, targeting both **Docker Hub** and the **GitHub Container Registry** (`ghcr.io`).
+
+Images are built for `linux/amd64` and `linux/arm64` (suitable for cloud VMs and Raspberry Pi alike).
+
+Two repository secrets are required in **Settings → Secrets → Actions**:
+
+| Secret | Value |
+|---|---|
+| `DOCKER_USERNAME` | Your Docker Hub username |
+| `DOCKER_PASSWORD` | A Docker Hub access token (not your password) |
+
+`GITHUB_TOKEN` is provided automatically by GitHub — no configuration needed.
+
+Dependabot is configured to open weekly PRs for updates to Go modules, Docker base images, and the Actions themselves.
+
 ## License
 
 CompExchange is free software released under the [GNU General Public License v3.0](LICENSE).
