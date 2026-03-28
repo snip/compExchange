@@ -31,7 +31,7 @@ html, body {
   left: 0;
   bottom: 14px;                  /* anchored near bottom-left, above the chat bar */
   z-index: 11;                   /* above the chat overlay (z-index: 10) */
-  display: flex;
+  display: none;                 /* hidden until renderPinned() confirms there are messages */
   flex-direction: row;
   align-items: stretch;
   /* A defined height (not just max-height) is required for the inner
