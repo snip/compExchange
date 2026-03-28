@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up QEMU (for multi-platform builds)
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a
