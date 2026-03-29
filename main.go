@@ -105,9 +105,10 @@ type compInfo struct {
 	slug        string // filename stem = URL path segment
 	displayName string // COMP_NAME from config, falls back to slug
 	website     string // COMP_WEBSITE from config, optional
+	published   bool   // PUBLISHED=true required to appear in the listing
 }
 
-// readCompInfo reads just COMP_NAME and COMP_WEBSITE from a comp env file.
+// readCompInfo reads COMP_NAME, COMP_WEBSITE and PUBLISHED from a comp env file.
 func readCompInfo(slug string) compInfo {
 	info := compInfo{slug: slug, displayName: slug}
 	env, err := godotenv.Read(filepath.Join("comps", slug+".env"))
@@ -120,6 +121,7 @@ func readCompInfo(slug string) compInfo {
 	if v := env["COMP_WEBSITE"]; v != "" {
 		info.website = v
 	}
+	info.published = strings.EqualFold(env["PUBLISHED"], "true")
 	return info
 }
 
@@ -132,8 +134,11 @@ func (r *Registry) serveRoot(w http.ResponseWriter, req *http.Request) {
 			continue
 		}
 		slug := strings.TrimSuffix(e.Name(), ".env")
-		if compNameRe.MatchString(slug) {
-			comps = append(comps, readCompInfo(slug))
+		if !compNameRe.MatchString(slug) {
+			continue
+		}
+		if info := readCompInfo(slug); info.published {
+			comps = append(comps, info)
 		}
 	}
 
