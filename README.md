@@ -72,6 +72,7 @@ comps/
 | `COMP_NAME` | no | Human-readable name shown in the menu and title bar (falls back to filename stem) |
 | `COMP_WEBSITE` | no | Official competition website — the title bar becomes a link to it |
 | `BUFFER_SIZE` | no | Number of recent messages pre-loaded for new viewers (default: `20`) |
+| `PUBLISHED` | no | Set to `true` to list this competition on the root index page (default: `false`) |
 
 ### Global settings (OS environment variables)
 
@@ -88,6 +89,7 @@ GLIDE_URL=https://glideandseek.com/?embed=compexchange&taskUrl=https://example.c
 COMP_NAME=Championnat de France Club 2026
 COMP_WEBSITE=https://www.soaringspot.com/en_gb/my-comp/
 BUFFER_SIZE=30
+PUBLISHED=true
 ```
 
 ---
@@ -112,8 +114,8 @@ BUFFER_SIZE=30
 Add one `.env` file per competition to the `comps/` directory.
 The server detects them at runtime — no restart needed:
 
-- Visiting `/` shows a menu listing all configured competitions.
 - Visiting `/{name}/` loads that competition on demand (the bot connects and starts streaming).
+- Visiting `/` shows a menu listing only competitions with `PUBLISHED=true`. If exactly one is published, it redirects there directly. Competitions without `PUBLISHED=true` are still fully accessible via their direct URL — they are simply unlisted.
 - If a config file is deleted, the competition stays available until all viewers leave, then it is unloaded automatically after 5 minutes.
 
 ---
@@ -164,7 +166,6 @@ compExchange/
 │   └── style.css      # Styles
 ├── comps/
 │   └── .env.example   # Competition config template
-├── .env.example       # Legacy — superseded by comps/.env.example
 ├── .gitignore
 └── go.mod
 ```
