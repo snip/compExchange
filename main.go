@@ -323,10 +323,18 @@ func sseHandler(comp *Competition) http.HandlerFunc {
 			atomic.AddInt32(&comp.activeConns, -1)
 		}()
 
+		heartbeat := time.NewTicker(30 * time.Second)
+		defer heartbeat.Stop()
+
 		for {
 			select {
 			case <-r.Context().Done():
 				return
+			case <-heartbeat.C:
+				// SSE comment — keeps the connection alive through nginx / load
+				// balancers that would otherwise time out a silent connection.
+				fmt.Fprintf(w, ": ping\n\n")
+				flusher.Flush()
 			case msg, ok := <-client:
 				if !ok {
 					return
