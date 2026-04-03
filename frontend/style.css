@@ -522,7 +522,7 @@ html, body {
 
 /* ── Responsive ────────────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
-  #overlay { height: 40vh; }
+  #overlay { height: 14vh; }
 }
 
 /*
