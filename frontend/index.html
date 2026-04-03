@@ -27,6 +27,10 @@
     </a>
   </div>
 
+  <!-- Transparent full-screen scrim: shown when pinned panel is open so that
+       taps anywhere outside the panel are caught before the iframe sees them. -->
+  <div id="pinned-scrim" aria-hidden="true"></div>
+
   <!-- Pinned messages panel (left side) -->
   <div id="pinned-panel">
 
@@ -283,30 +287,63 @@
     const pinnedTab = document.getElementById('pinned-tab');
     let autoCloseTimer = null;
 
-    // Toggle locked-open state when the pin tab is clicked.
+    const pinnedScrim = document.getElementById('pinned-scrim');
+
+    function openPinnedPanel(panel) {
+      panel.classList.add('locked');
+      pinnedScrim.style.display = 'block';
+    }
+
+    function closePinnedPanel() {
+      const panel = document.getElementById('pinned-panel');
+      if (!panel) return;
+      panel.classList.remove('locked', 'auto-open');
+      pinnedScrim.style.display = 'none';
+      clearTimeout(autoCloseTimer);
+    }
+
+    // Tapping the scrim (anywhere outside the panel) closes the panel,
+    // but only when it is in auto-open mode — a locked panel stays open.
+    pinnedScrim.addEventListener('pointerdown', () => {
+      const panel = document.getElementById('pinned-panel');
+      if (panel && panel.classList.contains('locked')) return;
+      closePinnedPanel();
+    });
+
+    // Toggle panel state when the pin tab is clicked.
     pinnedTab.addEventListener('click', () => {
       const panel = document.getElementById('pinned-panel');
-      panel.classList.toggle('locked');
-      clearTimeout(autoCloseTimer);
+      if (panel.classList.contains('locked')) {
+        // Locked → close.
+        closePinnedPanel();
+      } else if (panel.classList.contains('auto-open')) {
+        // Auto-open → promote to locked (pin turns gold).
+        clearTimeout(autoCloseTimer);
+        panel.classList.remove('auto-open');
+        openPinnedPanel(panel);
+      } else if (window.matchMedia('(hover: none)').matches) {
+        // Mobile, minimized → auto-open (no immediate lock).
+        autoOpenPanel();
+      } else {
+        // Desktop, open via :hover → lock it.
+        openPinnedPanel(panel);
+      }
     });
 
     function autoOpenPanel() {
-      const panel   = document.getElementById('pinned-panel');
-      const content = document.getElementById('pinned-content');
-      if (!panel || !content) return;
+      const panel = document.getElementById('pinned-panel');
+      if (!panel) return;
 
       // If already locked open, nothing to do.
       if (panel.classList.contains('locked')) return;
 
-      content.style.width = '260px';
+      panel.classList.add('auto-open');
+      pinnedScrim.style.display = 'block';
       clearTimeout(autoCloseTimer);
       autoCloseTimer = setTimeout(() => {
         if (!panel.classList.contains('locked')) {
-          // Always clear the inline style. If the panel is still hovered the
-          // CSS :hover rule keeps it open; when the mouse leaves it closes
-          // normally. Leaving the inline style set would cause it to stay
-          // open forever after the mouse moves away.
-          content.style.width = '';
+          panel.classList.remove('auto-open');
+          pinnedScrim.style.display = 'none';
         }
       }, 5000);
     }

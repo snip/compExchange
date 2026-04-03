@@ -19,6 +19,20 @@ html, body {
   z-index: 0;
 }
 
+/* ── Pinned panel scrim ─────────────────────────────────────────────────────── */
+/* Invisible full-screen layer shown while the pinned panel is open.
+   z-index 5: above the map (0) but below the chat overlay (10) and panel (11).
+   Catches taps anywhere outside the panel so they close it reliably,
+   even when the underlying element is an iframe (which eats pointer events). */
+#pinned-scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  background: transparent;
+  cursor: default;
+}
+
 /* ── Pinned messages panel (left side) ─────────────────────────────────────── */
 
 /*
@@ -34,6 +48,15 @@ html, body {
   display: none;                 /* hidden until renderPinned() confirms there are messages */
   flex-direction: row;
   align-items: stretch;
+  /* Collapsed: only the pin icon — 44px tall.
+     Expanded (hover / locked / auto-open): full panel height. */
+  height: 44px;
+  transition: height 0.2s ease;
+}
+
+#pinned-panel:hover,
+#pinned-panel.auto-open,
+#pinned-panel.locked {
   /* A defined height (not just max-height) is required for the inner
      flex scroll to work. min() keeps it reasonable on small screens. */
   height: min(380px, 52vh);
@@ -44,7 +67,7 @@ html, body {
   width: 28px;
   flex-shrink: 0;
   display: flex;
-  align-items: flex-end;         /* pin icon near the bottom, matching panel anchor */
+  align-items: flex-end;         /* pin icon near the bottom when panel is tall */
   justify-content: center;
   padding-bottom: 10px;
   background: rgba(10, 10, 20, 0.82);
@@ -537,6 +560,13 @@ html, body {
   #overlay:not(.editing):hover #overlay-header { opacity: 0; pointer-events: none; }
   #overlay:not(.editing):hover #messages       { background-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.5) 6%, black 18%); mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.5) 6%, black 18%); }
   #overlay:not(.editing):hover::before         { opacity: 1; }
+
+  /* On touch devices the pinned panel only opens via JS classes (locked /
+     auto-open). Neutralise sticky :hover so the panel stays collapsed until
+     JS explicitly expands it, keeping the scrim logic in sync. */
+  #pinned-panel:not(.locked):not(.auto-open) { height: 44px; }
+  #pinned-panel:not(.locked):not(.auto-open) #pinned-content { width: 0; overflow: hidden; }
+  #pinned-panel:not(.locked):not(.auto-open) #pinned-tab     { background: rgba(10, 10, 20, 0.82); border-radius: 0 6px 6px 0; }
 
   .resize-grip {
     width: 64px;
