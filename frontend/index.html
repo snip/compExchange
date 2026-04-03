@@ -420,6 +420,19 @@
     let dragStartY = 0;
     let dragStartH = 0;
 
+    const mapEl = document.getElementById('map');
+
+    // Disable / restore iframe pointer-events so it never steals touch events
+    // from the overlay controls or the resize handle.
+    function enterEditMode() {
+      overlay.classList.add('editing');
+      mapEl.style.pointerEvents = 'none';
+    }
+    function leaveEditMode() {
+      overlay.classList.remove('editing');
+      mapEl.style.pointerEvents = '';
+    }
+
     resizeHandle.addEventListener('pointerdown', (e) => {
       if (overlay.classList.contains('collapsed')) return;
       e.preventDefault();
@@ -429,7 +442,7 @@
       dragStartY = e.clientY;
       dragStartH = overlay.offsetHeight;
       resizeHandle.classList.add('dragging');
-      overlay.classList.add('editing');
+      enterEditMode();
       overlay.style.transition = 'none';
     });
 
@@ -444,7 +457,7 @@
 
     function endDrag(e) {
       resizeHandle.classList.remove('dragging');
-      overlay.classList.remove('editing');
+      leaveEditMode();
       overlay.style.transition = '';
     }
 
@@ -453,17 +466,23 @@
 
     // Touch devices: CSS :hover is sticky, so manage edit mode via .editing
     // only. Tap the overlay to enter edit mode; tap outside to leave.
+    // The iframe's pointer-events are disabled in edit mode so it cannot
+    // intercept touches aimed at the handle or header controls.
     if (window.matchMedia('(hover: none)').matches) {
       overlay.addEventListener('click', (e) => {
         // Always stop propagation so the document handler never fires for
         // taps inside the overlay (including on buttons/links).
         e.stopPropagation();
-        // Button/link taps keep edit mode but don't toggle it.
-        if (e.target.closest('button, a')) return;
-        overlay.classList.toggle('editing');
+        // Button, link, and resize-handle taps keep edit mode but don't toggle it.
+        if (e.target.closest('button, a, #resize-handle')) return;
+        if (overlay.classList.contains('editing')) {
+          leaveEditMode();
+        } else {
+          enterEditMode();
+        }
       });
       document.addEventListener('click', () => {
-        overlay.classList.remove('editing');
+        leaveEditMode();
       });
     }
   </script>

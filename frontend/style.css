@@ -235,7 +235,8 @@ html, body {
   align-items: center;
   justify-content: center;
   z-index: 11;
-  /* Widen the hit zone without making it visually large */
+  /* Prevent browser from treating the drag as a scroll/pan gesture */
+  touch-action: none;
 }
 
 .resize-grip {
@@ -539,10 +540,23 @@ html, body {
  * Touch screens: CSS :hover is sticky (activates on tap and never leaves).
  * Neutralise :hover-based edit-mode only when the overlay does NOT have the
  * JS-managed .editing class, so .editing rules always take precedence.
+ *
+ * Also enlarge the resize handle to a comfortable finger tap target (44 px).
  */
 @media (hover: none) {
   #overlay:not(.editing):hover .resize-grip      { opacity: 0; }
   #overlay:not(.editing):hover #overlay-header   { opacity: 0; pointer-events: none; }
   #overlay:not(.editing):hover #messages         { background-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; -webkit-mask-image: unset; mask-image: unset; }
   #overlay:not(.editing):hover #messages::before { opacity: 1; }
+
+  .resize-grip {
+    width: 64px;
+    height: 6px;
+    border-radius: 3px;
+  }
+
+  /* Keep grip visible while dragging on touch */
+  #resize-handle.dragging .resize-grip {
+    opacity: 1;
+  }
 }
