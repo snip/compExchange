@@ -199,6 +199,50 @@ html, body {
 #comp-title-link:hover { color: #5865f2; }
 
 /* ── Discord overlay ───────────────────────────────────────────────────────── */
+/*
+ * Gradient + blur backdrop anchored to the overlay box, never to #messages.
+ * #overlay is position:fixed and not a scroll container, so this ::before is
+ * permanently viewport-anchored and cannot drift when #messages is scrolled.
+ */
+#overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+
+  background: linear-gradient(
+    to bottom,
+    rgba(10, 10, 20, 0)    0%,
+    rgba(10, 10, 20, 0.25) 22%,
+    rgba(10, 10, 20, 0.62) 45%,
+    rgba(10, 10, 20, 0.88) 68%,
+    rgba(10, 10, 20, 0.92) 100%
+  );
+
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 0.5) 6%,
+    black 18%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 0.5) 6%,
+    black 18%
+  );
+}
+
+/* In edit mode the ::before fades out; #messages gets a solid bg instead */
+#overlay:hover::before,
+#overlay.editing::before {
+  opacity: 0;
+}
+
 #overlay {
   position: fixed;
   bottom: 0;
@@ -370,16 +414,11 @@ html, body {
   display: flex;
   flex-direction: column-reverse;
 
-  /*
-   * No backdrop-filter here in normal mode — the blur lives on ::before so
-   * it is masked by the same gradient (fading out at the top). In edit mode
-   * the blur is applied directly to #messages over the solid background.
-   *
-   * The mask-image here applies to the message children (text), making them
-   * transparent at the top and fully opaque at the bottom — matching the
-   * background and blur gradient on ::before.
-   */
-  background-color: transparent;
+  /* Background and blur live on #overlay::before (viewport-anchored, never
+     drifts on scroll). The mask here fades only the message text: transparent
+     at the top, fully opaque at 18%. Applied directly to the element (not a
+     positioned child), so it is not affected by the column-reverse scroll bug. */
+  background: transparent;
   position: relative;
 
   -webkit-mask-image: linear-gradient(
@@ -397,58 +436,13 @@ html, body {
 
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.12) transparent;
+  overscroll-behavior: contain;
 }
+
 
 /*
- * Gradient + blur layer: the backdrop-filter lives here so the mask-image
- * clips both the background gradient and the blur together — the top of the
- * overlay is fully transparent (no colour, no blur) and the bottom is fully
- * opaque with blur, exactly as if mask-image were on the container itself.
- */
-#messages::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-
-  background: linear-gradient(
-    to bottom,
-    rgba(10, 10, 20, 0)    0%,
-    rgba(10, 10, 20, 0.25) 22%,
-    rgba(10, 10, 20, 0.62) 45%,
-    rgba(10, 10, 20, 0.88) 68%,
-    rgba(10, 10, 20, 0.92) 100%
-  );
-
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    rgba(0, 0, 0, 0.5) 6%,
-    black 18%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    rgba(0, 0, 0, 0.5) 6%,
-    black 18%
-  );
-
-  opacity: 1;
-}
-
-/* Message content sits above the ::before gradient layer */
-#messages > * {
-  position: relative;
-  z-index: 1;
-}
-
-/*
- * Edit mode (hover or active drag): solid background + full-height blur on
- * the container itself; the masked ::before is hidden.
+ * Edit mode: solid background + full-height blur directly on #messages.
+ * #overlay::before (the gradient layer) is hidden via opacity: 0 above.
  */
 #overlay:hover #messages,
 #overlay.editing #messages {
@@ -457,11 +451,6 @@ html, body {
   -webkit-backdrop-filter: blur(8px);
   -webkit-mask-image: none;
   mask-image: none;
-}
-
-#overlay:hover #messages::before,
-#overlay.editing #messages::before {
-  opacity: 0;
 }
 
 #messages::-webkit-scrollbar { width: 3px; }
@@ -544,10 +533,10 @@ html, body {
  * Also enlarge the resize handle to a comfortable finger tap target (44 px).
  */
 @media (hover: none) {
-  #overlay:not(.editing):hover .resize-grip      { opacity: 0; }
-  #overlay:not(.editing):hover #overlay-header   { opacity: 0; pointer-events: none; }
-  #overlay:not(.editing):hover #messages         { background-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; -webkit-mask-image: unset; mask-image: unset; }
-  #overlay:not(.editing):hover #messages::before { opacity: 1; }
+  #overlay:not(.editing):hover .resize-grip    { opacity: 0; }
+  #overlay:not(.editing):hover #overlay-header { opacity: 0; pointer-events: none; }
+  #overlay:not(.editing):hover #messages       { background-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.5) 6%, black 18%); mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.5) 6%, black 18%); }
+  #overlay:not(.editing):hover::before         { opacity: 1; }
 
   .resize-grip {
     width: 64px;
