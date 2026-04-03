@@ -450,6 +450,22 @@
 
     resizeHandle.addEventListener('pointerup',     endDrag);
     resizeHandle.addEventListener('pointercancel', endDrag);
+
+    // Touch devices: CSS :hover is sticky, so manage edit mode via .editing
+    // only. Tap the overlay to enter edit mode; tap outside to leave.
+    if (window.matchMedia('(hover: none)').matches) {
+      overlay.addEventListener('click', (e) => {
+        // Always stop propagation so the document handler never fires for
+        // taps inside the overlay (including on buttons/links).
+        e.stopPropagation();
+        // Button/link taps keep edit mode but don't toggle it.
+        if (e.target.closest('button, a')) return;
+        overlay.classList.toggle('editing');
+      });
+      document.addEventListener('click', () => {
+        overlay.classList.remove('editing');
+      });
+    }
   </script>
 </body>
 </html>

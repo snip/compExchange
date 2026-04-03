@@ -247,7 +247,8 @@ html, body {
   transition: background 0.15s, transform 0.15s, opacity 0.2s ease;
 }
 
-#overlay:hover .resize-grip {
+#overlay:hover .resize-grip,
+#overlay.editing .resize-grip {
   opacity: 1;
 }
 
@@ -275,7 +276,8 @@ html, body {
   transition: opacity 0.2s ease;
 }
 
-#overlay:hover #overlay-header {
+#overlay:hover #overlay-header,
+#overlay.editing #overlay-header {
   opacity: 1;
   pointer-events: auto;
 }
@@ -531,4 +533,16 @@ html, body {
 /* ── Responsive ────────────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
   #overlay { height: 40vh; }
+}
+
+/*
+ * Touch screens: CSS :hover is sticky (activates on tap and never leaves).
+ * Neutralise :hover-based edit-mode only when the overlay does NOT have the
+ * JS-managed .editing class, so .editing rules always take precedence.
+ */
+@media (hover: none) {
+  #overlay:not(.editing):hover .resize-grip      { opacity: 0; }
+  #overlay:not(.editing):hover #overlay-header   { opacity: 0; pointer-events: none; }
+  #overlay:not(.editing):hover #messages         { background-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; -webkit-mask-image: unset; mask-image: unset; }
+  #overlay:not(.editing):hover #messages::before { opacity: 1; }
 }
