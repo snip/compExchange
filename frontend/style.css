@@ -368,10 +368,47 @@ html, body {
   flex-direction: column-reverse;
 
   /*
-   * The blur + background both fade from fully transparent at the top to
-   * fully opaque at the bottom. The mask-image governs all three at once:
-   * backdrop-filter, background, and text.
+   * No backdrop-filter here in normal mode — the blur lives on ::before so
+   * it is masked by the same gradient (fading out at the top). In edit mode
+   * the blur is applied directly to #messages over the solid background.
+   *
+   * The mask-image here applies to the message children (text), making them
+   * transparent at the top and fully opaque at the bottom — matching the
+   * background and blur gradient on ::before.
    */
+  background-color: transparent;
+  position: relative;
+
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 0.5) 6%,
+    black 18%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 0.5) 6%,
+    black 18%
+  );
+
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.12) transparent;
+}
+
+/*
+ * Gradient + blur layer: the backdrop-filter lives here so the mask-image
+ * clips both the background gradient and the blur together — the top of the
+ * overlay is fully transparent (no colour, no blur) and the bottom is fully
+ * opaque with blur, exactly as if mask-image were on the container itself.
+ */
+#messages::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 
@@ -397,8 +434,31 @@ html, body {
     black 18%
   );
 
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.12) transparent;
+  opacity: 1;
+}
+
+/* Message content sits above the ::before gradient layer */
+#messages > * {
+  position: relative;
+  z-index: 1;
+}
+
+/*
+ * Edit mode (hover or active drag): solid background + full-height blur on
+ * the container itself; the masked ::before is hidden.
+ */
+#overlay:hover #messages,
+#overlay.editing #messages {
+  background-color: rgba(10, 10, 20, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+#overlay:hover #messages::before,
+#overlay.editing #messages::before {
+  opacity: 0;
 }
 
 #messages::-webkit-scrollbar { width: 3px; }

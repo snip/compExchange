@@ -429,6 +429,7 @@
       dragStartY = e.clientY;
       dragStartH = overlay.offsetHeight;
       resizeHandle.classList.add('dragging');
+      overlay.classList.add('editing');
       overlay.style.transition = 'none';
     });
 
@@ -443,6 +444,7 @@
 
     function endDrag(e) {
       resizeHandle.classList.remove('dragging');
+      overlay.classList.remove('editing');
       overlay.style.transition = '';
     }
 
