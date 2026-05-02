@@ -45,7 +45,7 @@ jobs:
 
       - name: Extract metadata (tags, labels)
         id: meta
-        uses: docker/metadata-action@4378dc6be7f72231dfe78ac7e0364a44f1c9f54b
+        uses: docker/metadata-action@4f5b5234679dfa19837d4942067c97d7df43b7b3
         with:
           images: |
             ${{ secrets.DOCKER_USERNAME }}/compexchange
